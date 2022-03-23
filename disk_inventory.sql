@@ -232,7 +232,73 @@ VALUES
 	FROM disk_has_borrower
 	WHERE returned_date IS NULL
 
+	-- Start P4
+--1. Show all disks in your database, the type, & status. 
+SELECT 'Disk Name' = disk_name, 'Release Date' = CONVERT(varchar, release_date, 101), 
+	'Type' = disk_type.description, 'Genre' = genre.description,
+	'Status' = status.description
+FROM Disk
+JOIN disk_type
+	ON disk.disk_type_id = disk_type.disk_type_id 
+JOIN genre
+	ON disk.genre_id =  genre.genre_id
+JOIN status
+	ON disk.status_id = status.status_id
+ORDER BY disk_name;
 
+-- 2. Show all borrowed disks and who borrowed them.
+SELECT 'Last' = lname, 'First' = fname, 'Disk Name' = disk_name, 
+	'Borrowed Date' = CAST(borrowed_date AS date), 'Returned Date' = CAST(returned_date AS date)
+FROM disk_has_borrower
+JOIN borrower 
+	ON disk_has_borrower.borrower_id = borrower.borrower_id
+JOIN disk
+	ON disk_has_borrower.disk_id = disk.disk_id
+ORDER BY lname;
+
+-- 3. Show the disks that have been borrowed more than once.
+SELECT 'Disk Name' = disk_name, 'Times Borrowed' = COUNT(*)
+FROM disk_has_borrower
+JOIN disk
+	ON disk_has_borrower.disk_id = disk.disk_id
+GROUP BY disk_name
+HAVING COUNT (*) > 1
+ORDER BY disk_name
+
+-- 4. Show the disks outstanding or on-loan and who took each disk.
+SELECT 'Disk Name' = disk_name, 'Borrowed' = CAST(borrowed_date AS date), 
+	'Returned' = returned_date, 'Last Name' = lname, 'First Name' = fname
+FROM disk
+JOIN disk_has_borrower
+	ON disk.disk_id = disk_has_borrower.disk_id
+JOIN borrower
+	ON borrower.borrower_id = disk_has_borrower.borrower_id
+WHERE returned_date IS NULL
+ORDER BY disk_name
+
+GO
+
+-- 5. Create a view called View_Borrower_No_Loans that shows the borrowers who have not borrowed a disk. Include the borrower id in the view definition but do not display the id in your output.
+CREATE VIEW View_Borrower_No_Loans
+AS
+SELECT borrower_id, lname, fname
+FROM borrower
+WHERE borrower_id NOT IN
+	(SELECT DISTINCT borrower_id
+	FROM disk_has_borrower);
+GO
+SELECT 'Last Name' = lname, 'First Name' = fname
+FROM View_Borrower_No_Loans
+ORDER BY lname, fname;
+
+-- 6. Show the borrowers who have borrowed more than 1 disk. Sample Output:
+SELECT 'Last Name' = lname, 'First Name' = fname, 'Disks Borrowed' = COUNT(DISTINCT disk_id) 
+FROM disk_has_borrower
+JOIN borrower
+	ON borrower.borrower_id = disk_has_borrower.borrower_id
+GROUP BY lname, fname
+HAVING COUNT(*) > 1
+ORDER BY lname, fname
 
 
 
