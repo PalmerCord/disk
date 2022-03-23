@@ -299,7 +299,7 @@ JOIN borrower
 GROUP BY lname, fname
 HAVING COUNT(*) > 1
 ORDER BY lname, fname
-
+ 
 
 
 
