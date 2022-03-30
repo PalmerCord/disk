@@ -4,6 +4,9 @@
 *2/28/2022  CPalmer		Initial implementation of disk db.
  3/2/2022	CPalmer		Added insert statements to populate db.
  3/11/2022	CPalmer		Inserted Data
+ 3/18/2022	CPalmer		Add report statements
+ 3/28/2022	CPalmer		Add stored procs to ins & update disk_has_borrower
+ 3/30/2022	CPalmer		Add sp's to ins, upd & del borrower & disk
 *
 ********************************************************************/
 
@@ -291,7 +294,7 @@ SELECT 'Last Name' = lname, 'First Name' = fname
 FROM View_Borrower_No_Loans
 ORDER BY lname, fname;
 
--- 6. Show the borrowers who have borrowed more than 1 disk. Sample Output:
+-- 6. Show the borrowers who have borrowed more than 1 disk.
 SELECT 'Last Name' = lname, 'First Name' = fname, 'Disks Borrowed' = COUNT(DISTINCT disk_id) 
 FROM disk_has_borrower
 JOIN borrower
@@ -299,11 +302,128 @@ JOIN borrower
 GROUP BY lname, fname
 HAVING COUNT(*) > 1
 ORDER BY lname, fname
- 
 
+--create proc sp_ins_disk_has_borrower
+use disk_inventorycp;
 
+DROP PROC IF EXISTS  sp_ins_disk_has_borrower;
+go
+CREATE PROC sp_ins_disk_has_borrower
+	@borrower_id int, @disk_id int, @borrowed_date datetime2, @returned_date datetime2 = NULL
+AS
+BEGIN TRY
+	INSERT disk_has_borrower
+		(borrower_id, disk_id, borrowed_date, returned_date)
+	VALUES
+		(@borrower_id, @disk_id, @borrowed_date, @returned_date);
+END TRY
+BEGIN CATCH
+	PRINT 'An Error Occured';
+	PRINT 'Message: ' + CONVERT(VARCHAR(200), ERROR_MESSAGE());
+END CATCH
+go
+GRANT EXEC ON sp_ins_disk_has_borrower TO diskusercp;
+go
+sp_ins_disk_has_borrower 2, 3, '3-27-2022', '3-28-2022'
+go
+sp_ins_disk_has_borrower 4, 5, '3-27-2022'
+go
 
+DROP PROC IF EXISTS sp_upd_disk_has_borrower
+GO
 
+CREATE PROC sp_upd_disk_has_borrower
+	@disk_has_borrower_id int, @borrower_id int, @disk_id int, @borrowed_date datetime2, @returned_date datetime2 = NULL
+AS
+	BEGIN TRY
+		UPDATE disk_has_borrower
+		SET borrower_id = @borrower_id,
+			disk_id = @disk_id,
+			borrowed_date = @borrowed_date,
+			returned_date = @returned_date
+		WHERE disk_has_borrower_id = @disk_has_borrower_id;
+	END TRY
+	BEGIN CATCH
+		PRINT 'an error occurred.';
+		PRINT 'Message: ' + CONVERT(VARCHAR(200), ERROR_MESSAGE());
+	END CATCH
+GO
 
+sp_upd_disk_has_borrower 24, 2, 4, '3-3-2022', '3-23-2022';
+GO
+declare @today datetime2 = getdate();
+exec sp_upd_disk_has_borrower 24, 2, 3, '3-13-2022', @today;
+GO
 
+DROP PROC IF EXISTS sp_ins_disk;
+GO
+CREATE PROC sp_ins_disk
+	@disk_name nvarchar(6), @release_date date, @genre_id int, @status_id int, @disk_type_id int
+AS
+	BEGIN TRY
+		INSERT disk
+		(disk_name, release_date, genre_id, status_id, disk_type_id)
+		VALUES 
+		(@disk_name, @release_date, @genre_id, @status_id, @disk_type_id)
 
+	END TRY
+	BEGIN CATCH
+		PRINT 'an error occurred.';
+		PRINT 'Message: ' + CONVERT(VARCHAR(200), ERROR_MESSAGE());
+	END CATCH
+GO
+--Grant Permissions
+GRANT EXECUTE ON sp_ins_disk TO diskUsercp;
+GO
+EXEC sp_ins_disk 'Lightning Bolt', '2/2/2021', 4, 1, 1
+GO
+EXEC sp_ins_disk 'Lightning Bolt', '2/2/2021', 4, 1, NULL
+GO
+
+DROP PROC IF EXISTS sp_upd_disk;
+go
+CREATE PROC sp_upd_disk
+	@disk_id int, @disk_name nvarchar(60), @release_date date, @genre_id int, @status_id int, @disk_type_id int
+AS
+	BEGIN TRY
+		UPDATE disk
+		SET disk_name = @disk_name,
+			release_date = @release_date,
+			genre_id = @genre_id,
+			status_id = @status_id,
+			disk_type_id = @disk_type_id
+		WHERE disk_id = @disk_id;
+	END TRY
+	BEGIN CATCH
+		PRINT 'an error occurred.';
+		PRINT 'Message: ' + CONVERT(VARCHAR(200), ERROR_MESSAGE());
+	END CATCH
+GO
+--Grant Permissions
+GRANT EXECUTE ON sp_upd_disk TO diskUsercp;
+GO
+EXEC sp_upd_disk 23, 'Lightning Updated', '2013-1-1', 5, 4, 3
+GO
+EXEC sp_upd_disk 23, 'Lightning Updated2', '2013-1-1', 3, 2, NULL
+GO
+
+DROP PROC IF EXISTS sp_del_disk;
+GO
+CREATE PROC sp_del_disk
+	@disk_id int
+AS
+	BEGIN TRY
+		DELETE FROM [dbo].[disk]
+			  WHERE disk_id = @disk_id;
+	END TRY
+	BEGIN CATCH
+		PRINT 'an error occurred.';
+		PRINT 'Message: ' + CONVERT(VARCHAR(200), ERROR_MESSAGE());
+	END CATCH
+GO
+GRANT EXECUTE ON sp_del_disk TO diskUsercp;
+GO
+EXEC sp_del_disk 22; --Works without errors
+GO
+EXEC sp_del_disk 3;	--Controlled error
+GO
